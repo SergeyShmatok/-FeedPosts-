@@ -38,7 +38,7 @@ class AppLoginFragment: Fragment() {
 loginViewModel.loginSuccessful.flowWithLifecycle(viewLifecycle).onEach {
     loginViewModel.toastFun(true)
     loginViewModel.loginSuccessfulIsNull()
-    findNavController().navigate(R.id.action_application_login_fragment_to_feedFragment)
+    findNavController().navigateUp()
 
 }.launchIn(viewLifecycleScope)
 

@@ -8,8 +8,12 @@ import androidx.core.view.isVisible
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
+import ru.netology.nmedia.BuildConfig
 import ru.netology.nmedia.R
+import ru.netology.nmedia.databinding.CardAdBinding
 import ru.netology.nmedia.databinding.CardPostBinding
+import ru.netology.nmedia.dto.Ad
+import ru.netology.nmedia.dto.FeedItem
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.util.loadAttachments
 import ru.netology.nmedia.util.loadAvatars
@@ -22,29 +26,66 @@ interface OnInteractionListener {
     fun openPhoto(post: Post){}
 }
 
+typealias ViewHolder = RecyclerView.ViewHolder
+typealias Diff = DiffUtil.ItemCallback<FeedItem>
+
 class PostsAdapter(
     private val onInteractionListener: OnInteractionListener,
-) : PagingDataAdapter<Post, PostViewHolder>(PostDiffCallback()) {
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PostViewHolder {
-        val binding = CardPostBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return PostViewHolder(binding, onInteractionListener)
+) : PagingDataAdapter<FeedItem, ViewHolder>(PostDiffCallback()) {
+
+// Метод getItemViewType() в Android позволяет определить разные типы представлений (view types)
+// для одного элемента данных.
+
+    override fun getItemViewType(position: Int): Int {
+        return when (getItem(position)) {
+            is Ad -> R.layout.card_ad
+            is Post -> R.layout.card_post
+            null -> error("unknown item type")
+        }
     }
 
-    override fun onBindViewHolder(holder: PostViewHolder, position: Int) {
-        val post = getItem(position) ?: return // Потому что PagingDataAdapter может возвращать пустые элементы
-        holder.bind(post)
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder =
+
+        when (viewType) {
+            R.layout.card_post -> {
+                val binding =
+                    CardPostBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+                PostViewHolder(binding, onInteractionListener)
+            }
+
+            R.layout.card_ad -> {
+                val binding =
+                    CardAdBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+                AdViewHolder(binding)
+            }
+
+            else -> error("unknown item type: $viewType")
+        }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        when (val item = getItem(position)) {
+            is Ad -> (holder as? AdViewHolder)?.bind(item)
+            is Post -> (holder as? PostViewHolder)?.bind(item)
+            null -> error("unknown item type")
+        }
     }
 
 }
 
-const val AVATARS_URL = "http://10.0.2.2:9999/avatars/"
-const val ATTACHMENTS_URL = "http://10.0.2.2:9999/media/"
+
+class AdViewHolder(
+    private val binding: CardAdBinding,
+) : ViewHolder(binding.root) {
+
+    fun bind(ad: Ad) {
+        binding.image.loadAttachments("${BuildConfig.BASE_URL}/media/${ad.image}")
+    }
+}
 
 class PostViewHolder(
-
     private val binding: CardPostBinding,
     private val onInteractionListener: OnInteractionListener,
-) : RecyclerView.ViewHolder(binding.root) {
+) : ViewHolder(binding.root) {
 
     fun bind(post: Post) {
         binding.apply {
@@ -55,9 +96,9 @@ class PostViewHolder(
             like.isChecked = post.likedByMe
             like.text = "${post.likes}"
 
-            avatar.loadAvatars("${AVATARS_URL}${post.authorAvatar}")
+            avatar.loadAvatars("${BuildConfig.BASE_URL}/avatars/${post.authorAvatar}")
             if (post.attachment != null) attachment.apply {
-                loadAttachments("${ATTACHMENTS_URL}${post.attachment?.url}")
+                loadAttachments("${BuildConfig.BASE_URL}/media/${post.attachment?.url}")
                 // contentDescription = post.attachment?.description
                 visibility = View.VISIBLE }
                 else attachment.visibility = View.GONE
@@ -101,12 +142,14 @@ class PostViewHolder(
     }
 }
 
-class PostDiffCallback : DiffUtil.ItemCallback<Post>() {
-    override fun areItemsTheSame(oldItem: Post, newItem: Post): Boolean {
+class PostDiffCallback : Diff() {
+    override fun areItemsTheSame(oldItem: FeedItem, newItem: FeedItem): Boolean {
+         if (oldItem::class != newItem::class) return false
+
         return oldItem.id == newItem.id
     }
 
-    override fun areContentsTheSame(oldItem: Post, newItem: Post): Boolean {
+    override fun areContentsTheSame(oldItem: FeedItem, newItem: FeedItem): Boolean {
         return oldItem == newItem
     }
 }

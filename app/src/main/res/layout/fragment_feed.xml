@@ -129,6 +129,7 @@
             android:contentDescription="@string/some_contents_description"
             app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
             tools:listitem="@layout/card_post"
+
             />
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

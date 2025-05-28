@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import ru.netology.nmedia.dto.FeedItem
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.error.AppError
 import ru.netology.nmedia.error.NetworkError
@@ -48,28 +49,19 @@ class PostViewModel @Inject constructor (
     private val applicationContext: Context,
     ) : ViewModel() {
 
-        private val _pagingDate: Flow<PagingData<Post>> =
+        private val _pagingDate: Flow<PagingData<FeedItem>> =
         repository.pagingDate
             .cachedIn(viewModelScope)
             .catch { e -> throw AppError.from(e)} // В этом
-        // задании данные об авторстве поста (ownedByMe) рассчитываются на сервере.
+    // задании данные об авторстве поста (ownedByMe) рассчитываются на сервере.
 
-    val pagingData: Flow<PagingData<Post>>
+    // Оператор cachedIn() делает поток данных общим и кэширует загруженные
+    // данные с предоставленным CoroutineScope. При любом изменении конфигурации он
+    // предоставит существующие данные вместо получения данных с нуля. Это также
+    // предотвратит утечку памяти.
+
+    val pagingData: Flow<PagingData<FeedItem>>
         get() = _pagingDate
-
-//    private val _data: StateFlow<FeedModel> =
-//        repository.data.map { posts->
-//            FeedModel(
-//                posts.map { it }
-//            )
-//        }.catch { e -> throw AppError.from(e)}
-//            .stateIn(
-//        scope = viewModelScope,
-//        started = WhileSubscribed(5000),
-//            initialValue = FeedModel())
-//
-//    val data: StateFlow<FeedModel>
-//        get() = _data
 
     private val _dataState = MutableStateFlow(FeedModelState())
     val dataState: StateFlow<FeedModelState>
@@ -109,11 +101,6 @@ class PostViewModel @Inject constructor (
     val photo: StateFlow<PhotoModel?>
         get() = _photo
 
-
-//--------------------------------------------------------------------------------------------------
-
-//    init { loadPosts() }
-
 //--------------------------------------------------------------------------------------------------
 
     fun changePhoto (uri: Uri, file: File) {
@@ -126,43 +113,9 @@ class PostViewModel @Inject constructor (
 
 //--------------------------------------------------------------------------------------------------
 
-//    fun loadPosts(refreshed: Boolean = false) = viewModelScope.launch {
-//
-//        // viewModelScope описана на главном потоке (Dispatchers.Main.immediate),
-//        // но асинхронно с ним самим. "Корутины — это потоки исполнения кода,
-//        // которые организуются поверх системных потоков".
-//        // _data.value = (FeedModel(loading = true))
-//
-//        val state = if (refreshed) FeedModelState(refreshing = true)
-//        else FeedModelState(loading = true)
-//
-//        try {
-//            _dataState.value = state
-//            repository.getAll()
-//            _dataState.value = FeedModelState()
-//        } catch (e: Exception) {
-//            _dataState.value = FeedModelState(error = true)
-//            if (e is AppError) when (e) {
-//                is ApiError -> {} // Можно поставить разные "флаги" на разные ошибки
-//                is NetworkError -> {} // --//--
-//                is DbError -> {}
-//                else -> {} // --//--
-//
-//            }
-//        }
-//    }
-//--------------------------------------------------------------------------------------------------
-
    fun newPostsIsVisible() = viewModelScope.launch {
        repository.addNewPostsToRoom()
    }
-
-//--------------------------------------------------------------------------------------------------
-
-//    fun refreshing() {
-//        loadPosts(true)
-//
-//    }
 
 //--------------------------------------------------------------------------------------------------
 
@@ -280,149 +233,3 @@ class PostViewModel @Inject constructor (
 }
 
 //------------------------------------ End
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//                                       - Old code -
-//            repository.save(it, object : NMediaCallback<Post> {
-//                override fun onSuccess(data: Post) {
-//                    _postCreated.value = Unit
-//                    _data.value = _data.value?.copy(postIsAdded = true)
-//                }
-//
-//                override fun onError(e: Exception) {
-//                    _data.postValue(_data.value?.copy(postIsAdded = false))
-//                    // Можно создать SingleLiveEvent и отсюда менять его состояние. (Из вебинара)
-//                }
-//
-//            })
-
-//        repository.removeById(id, object : NMediaCallback<Unit> {
-//
-//
-//            //val old = _data.value?.posts.orEmpty()
-//
-//            override fun onSuccess(data: Unit) {
-//                _data.value = (
-//                        _data.value?.copy(posts = _data.value?.posts.orEmpty()
-//                            .filter { it.id != id }, postIsDeleted = true
-//                        )
-//                        )
-//            }
-//
-//            override fun onError(e: Exception) {
-//                _data.postValue(_data.value?.copy(postIsDeleted = false))
-//
-//            }
-//        })
-
-//    fun removeLike(id: Long) = viewModelScope.launch {
-//
-//         val old = _data.value?.posts.orEmpty()
-//
-//        try {
-//            repository.removeLike(id)
-//            _dataState.value = (FeedModelState(error = false))
-//        } catch (e: Exception) {
-//            _dataState.value = (FeedModelState(error = true))
-//
-//        }
-//
-
-//                      функция loadPosts реализованная через threads
-//        try {
-//            // Данные успешно получены
-//            val posts = repository.getAll()
-//            FeedModel(posts = posts, empty = posts.isEmpty())
-//        } catch (e: IOException) {
-//            // Получена ошибка
-//            FeedModel(error = true)
-//        }.also(_data::postValue)
-//}
-//        или так (решение из вебинара):
-//        val feedModel = try {
-//            // Данные успешно получены
-//            val posts = repository.getAll()
-//            FeedModel(posts = posts, empty = posts.isEmpty())
-//        } catch (e: IOException) {
-//            // Получена ошибка
-//            FeedModel(error = true)
-//        }
-//        _data.postValue(feedModel)
-//        _data.value = feedModel // - так не сработает, будет IllegalStateException: Cannot..
-
-//              функция likeById
-//        val old = _data.value?.posts.orEmpty()
-//
-//        try {
-//            repository.likeById(id).let {
-//                _data.postValue(
-//                    _data.value?.copy(posts = _data.value?.posts.orEmpty()
-//                        .map { post -> if (post.id != id) post else it })
-//                )
-//            }
-//
-//        } catch (e: IOException) {
-//            _data.postValue(_data.value?.copy(posts = old))
-//
-//        }
-//       функция  removeById
-//        thread {
-//            // Оптимистичная модель
-//            val old = _data.value?.posts.orEmpty()
-//            _data.postValue(
-//                _data.value?.copy(posts = _data.value?.posts.orEmpty()
-//                    .filter { it.id != id }
-//                )
-//            )
-//            try {
-//                repository.removeById(id)
-//            } catch (e: IOException) {
-//                _data.postValue(_data.value?.copy(posts = old))
-//            }
-//        }
-//                 функция removeLike
-//        thread {
-//            val old = _data.value?.posts.orEmpty()
-//
-//            try {
-//                repository.removeLike(id).let {
-//                    _data.postValue(
-//                        _data.value?.copy(posts = _data.value?.posts.orEmpty()
-//                            .map { post -> if (post.id != id) post else it })
-//                    )
-//                }
-//            } catch (e: IOException) {
-//                _data.postValue(_data.value?.copy(posts = old))
-//            }
-//
-//
-//        }
-
-//                _data.postValue(_data.value?.copy(posts = old
-//                    .map { post -> if (post.id != id) post else post.apply { likedByMe != likedByMe }
-//                    }))

@@ -1,9 +1,9 @@
 package ru.netology.nmedia.dto
 
-
 // Иногда в названии указывают прямо, что это объект именно для передачи данных.
 // (например, PostDto, а не просто Post)
-data class Post( val id: Long,
+data class Post(
+    override val id: Long,
     val authorId: Long,
     val author: String,
     val content: String,
@@ -14,7 +14,7 @@ data class Post( val id: Long,
     var attachment: Attachment? = null,
     val ownedByMe: Boolean = false,
 
-    )
+    ) : FeedItem
 
 data class Attachment(
     val url: String,
@@ -24,4 +24,13 @@ data class Attachment(
 
 enum class AttachmentType {
     IMAGE
+}
+
+data class Ad( // Объект рекламы
+override val id: Long,
+    val image: String,
+) : FeedItem
+
+sealed interface FeedItem { // для ограниченной реализации (sealed), будут наследоваться только некоторые объекты
+    val id: Long
 }

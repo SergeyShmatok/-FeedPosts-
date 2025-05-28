@@ -47,5 +47,6 @@
     <string name="proceed">Proceed</string>
     <string name="cancel">Cancel</string>
     <string name="entry">Entry</string>
+    <string name="ad_description">ad</string>
 
 </resources>

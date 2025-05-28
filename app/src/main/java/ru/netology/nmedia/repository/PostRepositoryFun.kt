@@ -3,11 +3,12 @@ package ru.netology.nmedia.repository
 import androidx.paging.PagingData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import ru.netology.nmedia.dto.FeedItem
 import ru.netology.nmedia.dto.Post
 import java.io.File
 
 interface PostRepositoryFun {
-    val pagingDate: Flow<PagingData<Post>>
+    val pagingDate: Flow<PagingData<FeedItem>>
     var newPost: MutableStateFlow<List<Post>>
     var newerCountData: Flow<Long?>
 

@@ -10,7 +10,7 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import dagger.hilt.android.AndroidEntryPoint
-import ru.netology.nmedia.adapter.ATTACHMENTS_URL
+import ru.netology.nmedia.BuildConfig
 import ru.netology.nmedia.databinding.FragmentPictureViewingBinding
 import ru.netology.nmedia.util.StringArg
 import ru.netology.nmedia.util.loadAttachments
@@ -42,7 +42,7 @@ class ImageViewingFragment : Fragment() {
 
         val url = arguments?.textArg2
 
-        binding.viewImage.loadAttachments("$ATTACHMENTS_URL${url}")
+        binding.viewImage.loadAttachments("${BuildConfig.BASE_URL}/media/${url}")
 
         binding.backForPicture.setOnClickListener {
             (requireActivity() as AppActivity).hideStatusBar(false)
@@ -72,17 +72,6 @@ class ImageViewingFragment : Fragment() {
 }
 
 
-//           - Настройка для кнопки "назад" в AppBar -
-
-//    override fun onCreate(savedInstanceState: Bundle?) {
-//        super.onCreate(savedInstanceState)
-//            // setDisplayHomeAsUpEnabled(true)
-//            // setHomeAsUpIndicator(R.drawable.baseline_arrow_back_24)
-//            // title = resources.getString(R.string._1_of_1)
-//
-//        }
-//    }
-//
 
 
 

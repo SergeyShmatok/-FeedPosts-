@@ -32,34 +32,31 @@ class PostRemoteMediator @Inject constructor(
 
                 // Обновление страницы
                 LoadType.REFRESH -> {
-
-                    if (dao.isEmpty()) apiService.getLatest(state.config.initialLoadSize)
-                    else
-                    { val id = remoteKeyDao.max() ?: return MediatorResult.Success(false)
-                    apiService.getAfter(id, state.config.pageSize) }
+                    if (dao.isEmpty()) apiService.getLatest(state.config.initialLoadSize) else {
+                        val id = remoteKeyDao.max() ?: return MediatorResult.Success(false)
+                        apiService.getAfter(id, state.config.pageSize)
+                    }
 
                 }
 
                 // Пользователь "скроллит вниз".
                 LoadType.APPEND -> {
                     val id = remoteKeyDao.min() ?: return MediatorResult.Success(false)
-                    // lastItemOrNull - последний загруженный элемент в списке или null, если все загруженные
-                    // страницы пусты или на момент создания этого PagingState не было загружено
-                    // ни одной страницы.
                     apiService.getBefore(id, state.config.pageSize)
                 }
 
                 // Пользователь "скроллит вверх".
-                LoadType.PREPEND -> return MediatorResult.Success(true)
-
-
+                LoadType.PREPEND -> {
+                    val id = remoteKeyDao.max() ?: return MediatorResult.Success(false)
+                    apiService.getAfter(id, state.config.pageSize)
+                }
             }
 
             if (!response.isSuccessful) {
-                throw ApiError(response.code(), response.message()) }
+                throw ApiError(response.code(), response.message())
+            }
 
-            val body = response.body() ?:
-            throw ApiError(response.code(), response.message())
+            val body = response.body() ?: throw ApiError(response.code(), response.message())
 
             abbDb.withTransaction { // Транзакция. Если произойдёт ошибка в операции с одной БД,
                 // то не будет выполнена вся операция. Нужно для того, чтобы при ошибке в выполнении,
@@ -74,7 +71,7 @@ class PostRemoteMediator @Inject constructor(
                                     PostRemoteKeyEntity(
                                         PostRemoteKeyEntity.KeyType.AFTER,
                                         body.first().id,
-                                        ),
+                                    ),
                                     PostRemoteKeyEntity(
                                         PostRemoteKeyEntity.KeyType.BEFORE,
                                         body.last().id,
@@ -82,16 +79,16 @@ class PostRemoteMediator @Inject constructor(
                                 )
                             )
                         } else {
-                            remoteKeyDao.insert (
-                                    PostRemoteKeyEntity(
-                                        PostRemoteKeyEntity.KeyType.AFTER,
-                                        body.first().id),
-                                )
+                            remoteKeyDao.insert(
+                                PostRemoteKeyEntity(
+                                    PostRemoteKeyEntity.KeyType.AFTER,
+                                    body.first().id
+                                ),
+                            )
                         }
 
-
-
                     }
+
 
                     LoadType.APPEND -> {
                         remoteKeyDao.insert(

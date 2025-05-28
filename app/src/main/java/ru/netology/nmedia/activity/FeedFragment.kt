@@ -27,7 +27,9 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import ru.netology.nmedia.R
 import ru.netology.nmedia.activity.ImageViewingFragment.Companion.textArg2
+import ru.netology.nmedia.adapter.InteractionListener
 import ru.netology.nmedia.adapter.OnInteractionListener
+import ru.netology.nmedia.adapter.PostLoadingStateAdapter
 import ru.netology.nmedia.adapter.PostsAdapter
 import ru.netology.nmedia.dao.PostDao
 import ru.netology.nmedia.dao.PostRemoteKeyDao
@@ -41,7 +43,7 @@ import ru.netology.nmedia.viewmodel.PostViewModel
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class FeedFragment: Fragment() {
+class FeedFragment : Fragment() {
 
     @Inject
     lateinit var dao: PostDao
@@ -72,56 +74,70 @@ class FeedFragment: Fragment() {
 
         val binding = FragmentFeedBinding.inflate(inflater, container, false)
 
-        val adapter = PostsAdapter(object : OnInteractionListener {
-            override fun onEdit(post: Post) {
-                viewModel.edit(post)
-            }
-
-            override fun onLike(post: Post) {
-
-                if (authViewModel.isAuthenticated) {
-                    if (!post.likedByMe) viewModel.likeById(post.id)
-                    else viewModel.removeLike(post.id)
-                } else {
-                    dialogBuilder(forLikes = true)
-                }
-            }
-
-
-            override fun onRemove(post: Post) {
-                viewModel.removeById(post.id)
-            }
-
-
-            override fun onShare(post: Post) {
-                val intent = Intent().apply {
-                    action = Intent.ACTION_SEND
-                    putExtra(Intent.EXTRA_TEXT, post.content)
-                    type = "text/plain"
+        val adapter = PostsAdapter(
+            object : OnInteractionListener {
+                override fun onEdit(post: Post) {
+                    viewModel.edit(post)
                 }
 
-                val shareIntent =
-                    Intent.createChooser(intent, getString(R.string.chooser_share_post))
-                startActivity(shareIntent)
-            }
+                override fun onLike(post: Post) {
 
-            override fun openPhoto(post: Post) {
+                    if (authViewModel.isAuthenticated) {
+                        if (!post.likedByMe) viewModel.likeById(post.id)
+                        else viewModel.removeLike(post.id)
+                    } else {
+                        dialogBuilder(forLikes = true)
+                    }
+                }
 
-                findNavController().navigate(
-                    R.id.action_feedFragment_to_imageViewingFragment,
-                    Bundle().apply { textArg2 = post.attachment?.url })
-            }
 
-        })
-        binding.list.adapter = adapter
+                override fun onRemove(post: Post) {
+                    viewModel.removeById(post.id)
+                }
 
+
+                override fun onShare(post: Post) {
+                    val intent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_TEXT, post.content)
+                        type = "text/plain"
+                    }
+
+                    val shareIntent =
+                        Intent.createChooser(intent, getString(R.string.chooser_share_post))
+                    startActivity(shareIntent)
+                }
+
+                override fun openPhoto(post: Post) {
+
+                    findNavController().navigate(
+                        R.id.action_feedFragment_to_imageViewingFragment,
+                        Bundle().apply { textArg2 = post.attachment?.url })
+                }
+
+            },
+        )
+
+        binding.list.adapter = adapter.withLoadStateHeaderAndFooter(
+            header = PostLoadingStateAdapter(object : InteractionListener {
+                override fun onRetry() {
+                    adapter.retry()
+                }
+            }),
+            footer = PostLoadingStateAdapter(object : InteractionListener {
+                override fun onRetry() {
+                    adapter.retry()
+                }
+            }),
+        )
+
+        binding.list.itemAnimator = null
 
         viewModel.pagingData.flowWithLifecycle(viewLifecycle).onEach { pagingData ->
 
             adapter.submitData(pagingData)
 
         }.launchIn(viewLifecycleScope)
-
 
         viewModel.dataState.flowWithLifecycle(viewLifecycle).onEach { stateModel ->
             binding.progress.isVisible = stateModel.loading
@@ -174,35 +190,30 @@ class FeedFragment: Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 adapter.loadStateFlow.collectLatest { state ->
                     binding.swiperefresh.isRefreshing =
-                        state.refresh is LoadState.Loading ||
-                                state.prepend is LoadState.Loading ||
-                                state.append is LoadState.Loading
-
-//                    if (state.refresh is LoadState.Loading && state.append is LoadState.NotLoading)
-//                        delay(5000)
-//                    binding.list.smoothScrollToPosition(0)
-
+                        state.refresh is LoadState.Loading
                 }
             }
         }
 
 
 
-        authViewModel.state.flowWithLifecycle(viewLifecycle).onEach {
-            // Обновление списка при раз/авторизации
-            adapter.refresh()
-
-        }.launchIn(viewLifecycleScope)
+        authViewModel.refreshEvents.flowWithLifecycle(viewLifecycle)
+            .onEach {
+                // Обновление списка при раз/авторизации
+                adapter.refresh()
+                authViewModel.onRefresh()
+            }.launchIn(viewLifecycleScope)
 
 
         binding.swiperefresh.setOnRefreshListener {
             viewModel.toastFun(true)
             viewModel.cleanNewPost()
-            adapter.refresh()
+                adapter.refresh()
             viewLifecycleOwner.lifecycleScope.launch {
-                delay(5300)
+                delay(5500)
                 binding.list.smoothScrollToPosition(0)
             }
+
         }
 
 
@@ -210,9 +221,7 @@ class FeedFragment: Fragment() {
             if (authViewModel.isAuthenticated) findNavController()
                 .navigate(R.id.action_feedFragment_to_newPostFragment)
             else {
-
                 dialogBuilder(forPosts = true)
-
             }
 
         }
@@ -244,11 +253,8 @@ class FeedFragment: Fragment() {
         )
 
 
-
-
         return binding.root
     }
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -280,6 +286,7 @@ class FeedFragment: Fragment() {
                 }
             }
         }
+
         super.onCreate(savedInstanceState)
     }
 
