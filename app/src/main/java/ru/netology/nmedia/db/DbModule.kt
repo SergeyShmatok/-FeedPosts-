@@ -35,7 +35,7 @@ class DbModule {
     @Provides
     fun providePostDao(
         appDb: AppDb
-    ): PostDao = appDb.postDao()
+    ): PostDao = appDb.postDao() // Через это обращаемся к функциям прописанным в интерфейсе PostDao
 
 //--------------------------------------------------------------------------------------------------
 

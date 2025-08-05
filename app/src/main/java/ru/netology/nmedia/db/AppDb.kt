@@ -17,29 +17,3 @@ abstract class AppDb : RoomDatabase() {
 
 }
 
-
-
-
-
-
-
-
-
-
-//    companion object {
-//        @Volatile
-//        private var instance: AppDb? = null
-//
-//        fun getInstance(context: Context): AppDb {
-//            return instance ?: synchronized(this) {
-//                instance ?: buildDatabase(context).also { instance = it }
-//            }
-//        }
-//
-//        private fun buildDatabase(context: Context) =
-//            Room.databaseBuilder(context, AppDb::class.java, "app.db")
-//                .fallbackToDestructiveMigration(true) // для миграции (**)
-//                // .allowMainThreadQueries() - чтобы можно было работать с Room
-//                //  на главном потоке (больше не нужно).
-//                .build()
-//    }

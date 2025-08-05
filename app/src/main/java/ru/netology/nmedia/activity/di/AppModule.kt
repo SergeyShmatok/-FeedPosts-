@@ -16,7 +16,8 @@ class AppModule {
     @Singleton
     @Provides
     fun provideGoogleApi () = GoogleApiAvailability.getInstance()
-
+    // Из вебинара, @Singleton можно убрать, потому что getInstance()
+    // должен указывать на то, что объект будет в единственном числе.
 
     @Singleton
     @Provides

@@ -29,7 +29,11 @@ import ru.netology.nmedia.auth.AppAuth
 import ru.netology.nmedia.viewmodel.AuthViewModel
 import javax.inject.Inject
 
-@AndroidEntryPoint
+
+
+@AndroidEntryPoint // Из вебинара...dagger сделает так, что мы будем наследоваться не от
+// AppCompatActivity, а от DaggerAppComp... У которого в super в onCreate будет вызов Inject,
+// который доставит все зависимости.
 class AppActivity: AppCompatActivity(R.layout.activity_app) {
 
 

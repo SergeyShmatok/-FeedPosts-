@@ -13,7 +13,6 @@ data class Post(
     val authorAvatar: String,
     var attachment: Attachment? = null,
     val ownedByMe: Boolean = false,
-
     ) : FeedItem
 
 data class Attachment(
@@ -30,6 +29,23 @@ data class Ad( // Объект рекламы
 override val id: Long,
     val image: String,
 ) : FeedItem
+
+
+data class TimingSeparator(
+     val type: TimingSeparatorType
+) : FeedItem {
+    override val id: Long = type.ordinal.toLong() // "свойство ordinal класса перечисления (enum)
+    // в Kotlin возвращает порядковый номер константы в списке enum".
+}
+
+enum class TimingSeparatorType {
+    TODAY,
+    YESTERDAY,
+    THIS_WEEK,
+    WEEK_AGO,
+
+}
+
 
 sealed interface FeedItem { // для ограниченной реализации (sealed), будут наследоваться только некоторые объекты
     val id: Long

@@ -131,203 +131,202 @@ class FeedFragment : Fragment() {
             }),
         )
 
-        binding.list.itemAnimator = null
+//        binding.list.itemAnimator = null
 
-        viewModel.pagingData.flowWithLifecycle(viewLifecycle).onEach { pagingData ->
+            viewModel.pagingData.flowWithLifecycle(viewLifecycle).onEach { pagingData ->
 
-            adapter.submitData(pagingData)
+                adapter.submitData(pagingData)
 
-        }.launchIn(viewLifecycleScope)
+            }.launchIn(viewLifecycleScope)
 
-        viewModel.dataState.flowWithLifecycle(viewLifecycle).onEach { stateModel ->
-            binding.progress.isVisible = stateModel.loading
-            binding.swiperefresh.isRefreshing = stateModel.refreshing
-            if (stateModel.error) {
-                Snackbar.make(binding.root, R.string.error_loading, Snackbar.LENGTH_INDEFINITE)
-                    .setAction(R.string.retry_loading) {
-                        adapter.refresh()
-                    }.show()
-            }
-            if (stateModel.likeError) {
-                viewModel.toastFun()
-                viewModel.cleanModel()
-            }
-            if (!stateModel.postIsDeleted) {
-                viewModel.toastFun()
-                viewModel.cleanModel()
-            }
-        }.launchIn(viewLifecycleScope)
-
-
-        viewModel.newerCount.flowWithLifecycle(viewLifecycle).onEach {
-            println("Новые посты: $it")
-            binding.newerPostsFab.text = getString(R.string.extended_fab_text)
-                .format("$it")
-        }.launchIn(viewLifecycleScope)
-
-
-        viewModel.newPostData.flowWithLifecycle(viewLifecycle).onEach { posts ->
-            binding.newerPostsFab.isVisible = !posts.isNullOrEmpty()
-
-        }.launchIn(viewLifecycleScope)
-
-        binding.newerPostsFab.setOnClickListener {
-            viewModel.newPostsIsVisible()
-            binding.list.smoothScrollToPosition(0)
-
-            viewLifecycleOwner.lifecycleScope.launch {
-                remoteKeyDao.insert(
-                    PostRemoteKeyEntity(
-                        PostRemoteKeyEntity.KeyType.AFTER,
-                        dao.takeLastId(),
-                    )
-                )
-
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                adapter.loadStateFlow.collectLatest { state ->
-                    binding.swiperefresh.isRefreshing =
-                        state.refresh is LoadState.Loading
+            viewModel.dataState.flowWithLifecycle(viewLifecycle).onEach { stateModel ->
+                binding.progress.isVisible = stateModel.loading
+                binding.swiperefresh.isRefreshing = stateModel.refreshing
+                if (stateModel.error) {
+                    Snackbar.make(binding.root, R.string.error_loading, Snackbar.LENGTH_INDEFINITE)
+                        .setAction(R.string.retry_loading) {
+                            adapter.refresh()
+                        }.show()
                 }
-            }
-        }
+                if (stateModel.likeError) {
+                    viewModel.toastFun()
+                    viewModel.cleanModel()
+                }
+                if (!stateModel.postIsDeleted) {
+                    viewModel.toastFun()
+                    viewModel.cleanModel()
+                }
+            }.launchIn(viewLifecycleScope)
 
-
-
-        authViewModel.refreshEvents.flowWithLifecycle(viewLifecycle)
-            .onEach {
-                // Обновление списка при раз/авторизации
-                adapter.refresh()
-                authViewModel.onRefresh()
+            viewModel.newerCount.flowWithLifecycle(viewLifecycle).onEach {
+                println("Новые посты: $it")
+                binding.newerPostsFab.text = getString(R.string.extended_fab_text)
+                    .format("$it")
             }.launchIn(viewLifecycleScope)
 
 
-        binding.swiperefresh.setOnRefreshListener {
-            viewModel.toastFun(true)
-            viewModel.cleanNewPost()
-                adapter.refresh()
-            viewLifecycleOwner.lifecycleScope.launch {
-                delay(5500)
+            viewModel.newPostData.flowWithLifecycle(viewLifecycle).onEach { posts ->
+                binding.newerPostsFab.isVisible = !posts.isNullOrEmpty()
+
+            }.launchIn(viewLifecycleScope)
+
+            binding.newerPostsFab.setOnClickListener {
+                viewModel.newPostsIsVisible()
                 binding.list.smoothScrollToPosition(0)
-            }
 
-        }
-
-
-        binding.fab.setOnClickListener {
-            if (authViewModel.isAuthenticated) findNavController()
-                .navigate(R.id.action_feedFragment_to_newPostFragment)
-            else {
-                dialogBuilder(forPosts = true)
-            }
-
-        }
-
-        binding.list.addOnScrollListener(
-            object : RecyclerView.OnScrollListener() {
-                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-
-
-                    if (dy > 0) { // Пользователь прокручивает вниз
-
-                        takeAppActivity().supportActionBar?.hide()
-                        binding.fab.visibility = View.INVISIBLE
-                        binding.newerPostsFab.isVisible = false
-
-                    } else { // Пользователь прокручивает вверх
-
-                        takeAppActivity().supportActionBar?.show()
-                        binding.fab.visibility = View.VISIBLE
-                        binding.newerPostsFab.isVisible =
-                            viewModel.newPostData.value?.isNotEmpty() ?: false
-                    }
-
-                    super.onScrolled(recyclerView, dx, dy)
+                viewLifecycleOwner.lifecycleScope.launch {
+                    remoteKeyDao.insert(
+                        PostRemoteKeyEntity(
+                            PostRemoteKeyEntity.KeyType.AFTER,
+                            dao.takeLastId(),
+                        )
+                    )
 
                 }
-
             }
-        )
 
-
-        return binding.root
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-
-        fun colorSetter(resId: Int) = AppCompatResources.getDrawable(requireContext(), resId)
-        // "Слушатель" навигации
-        findNavController().addOnDestinationChangedListener { _, destination, _ ->
-            when (destination.id) {
-                R.id.imageViewingFragment -> {
-                    takeAppActivity().apply {
-                        supportActionBar?.setBackgroundDrawable(colorSetter(R.color.black))
-                        supportActionBar?.hide()
-                        hideStatusBar(true)
-                    }
-                }
-
-                R.id.application_login_fragment -> {
-                    takeAppActivity().apply {
-                        supportActionBar?.hide()
-
-                    }
-
-                }
-
-                else -> {
-                    takeAppActivity().apply {
-                        supportActionBar?.setBackgroundDrawable(colorSetter(R.color.colorPrimary))
-                        supportActionBar?.show()
+            viewLifecycleOwner.lifecycleScope.launch {
+                viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    adapter.loadStateFlow.collectLatest { state ->
+                        binding.swiperefresh.isRefreshing =
+                            state.refresh is LoadState.Loading
                     }
                 }
             }
+
+
+
+            authViewModel.refreshEvents.flowWithLifecycle(viewLifecycle)
+                .onEach {
+                    // Обновление списка при раз/авторизации
+                    adapter.refresh()
+                    authViewModel.onRefresh()
+                }.launchIn(viewLifecycleScope)
+
+
+            binding.swiperefresh.setOnRefreshListener {
+                viewModel.toastFun(true)
+                viewModel.cleanNewPost()
+                adapter.refresh()
+                viewLifecycleOwner.lifecycleScope.launch {
+                    delay(5500)
+                    binding.list.smoothScrollToPosition(0)
+                }
+
+            }
+
+
+            binding.fab.setOnClickListener {
+                if (authViewModel.isAuthenticated) findNavController()
+                    .navigate(R.id.action_feedFragment_to_newPostFragment)
+                else {
+                    dialogBuilder(forPosts = true)
+                }
+
+            }
+
+            binding.list.addOnScrollListener(
+                object : RecyclerView.OnScrollListener() {
+                    override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+
+
+                        if (dy > 0) { // Пользователь прокручивает вниз
+
+                            takeAppActivity().supportActionBar?.hide()
+                            binding.fab.visibility = View.INVISIBLE
+                            binding.newerPostsFab.isVisible = false
+
+                        } else { // Пользователь прокручивает вверх
+
+                            takeAppActivity().supportActionBar?.show()
+                            binding.fab.visibility = View.VISIBLE
+                            binding.newerPostsFab.isVisible =
+                                viewModel.newPostData.value?.isNotEmpty() ?: false
+                        }
+
+                        super.onScrolled(recyclerView, dx, dy)
+
+                    }
+
+                }
+            )
+
+
+            return binding.root
         }
 
-        super.onCreate(savedInstanceState)
-    }
+        override fun onCreate(savedInstanceState: Bundle?) {
 
+            fun colorSetter(resId: Int) = AppCompatResources.getDrawable(requireContext(), resId)
+            // "Слушатель" навигации
+            findNavController().addOnDestinationChangedListener { _, destination, _ ->
+                when (destination.id) {
+                    R.id.imageViewingFragment -> {
+                        takeAppActivity().apply {
+                            supportActionBar?.setBackgroundDrawable(colorSetter(R.color.black))
+                            supportActionBar?.hide()
+                            hideStatusBar(true)
+                        }
+                    }
 
-    fun dialogBuilder(forPosts: Boolean = false, forLikes: Boolean = false) {
+                    R.id.application_login_fragment -> {
+                        takeAppActivity().apply {
+                            supportActionBar?.hide()
 
-        val writePosts = "Чтобы иметь возможность писать посты, войдите в NMedia."
+                        }
 
-        val putLikes = "Чтобы иметь возможность ставить лайки, войдите в NMedia."
+                    }
 
-        val standardPhrase =
-            "Чтобы иметь возможность пользоваться всеми функциями, войдите в NMedia."
+                    else -> {
+                        takeAppActivity().apply {
+                            supportActionBar?.setBackgroundDrawable(colorSetter(R.color.colorPrimary))
+                            supportActionBar?.show()
+                        }
+                    }
+                }
+            }
 
-        val phrase = when {
-            forPosts -> writePosts
-            forLikes -> putLikes
-            else -> standardPhrase
+            super.onCreate(savedInstanceState)
         }
 
-        val dialogBuilder = AlertDialog.Builder(requireActivity())
 
-        dialogBuilder.setMessage(phrase)
-            .setCancelable(false) // Если установить значение false, то пользователь
+        fun dialogBuilder(forPosts: Boolean = false, forLikes: Boolean = false) {
+
+            val writePosts = "Чтобы иметь возможность писать посты, войдите в NMedia."
+
+            val putLikes = "Чтобы иметь возможность ставить лайки, войдите в NMedia."
+
+            val standardPhrase =
+                "Чтобы иметь возможность пользоваться всеми функциями, войдите в NMedia."
+
+            val phrase = when {
+                forPosts -> writePosts
+                forLikes -> putLikes
+                else -> standardPhrase
+            }
+
+            val dialogBuilder = AlertDialog.Builder(requireActivity())
+
+            dialogBuilder.setMessage(phrase)
+                .setCancelable(false) // Если установить значение false, то пользователь
 //          не сможет закрыть диалоговое окно, например, нажатием в любой точке экрана.
 //          В таком случае пользователь должен нажать одну из предоставленных опций.
 
-            .setPositiveButton(getString(R.string.entry)) { dialog, _ ->
-                findNavController()
-                    .navigate(R.id.action_feedFragment_to_application_login_fragment)
-                dialog.cancel()
-            }
-            .setNegativeButton(getString(R.string.cancel)) { dialog, _ ->
-                dialog.cancel()
-            }
-        val alert = dialogBuilder.create()
+                .setPositiveButton(getString(R.string.entry)) { dialog, _ ->
+                    findNavController()
+                        .navigate(R.id.action_feedFragment_to_application_login_fragment)
+                    dialog.cancel()
+                }
+                .setNegativeButton(getString(R.string.cancel)) { dialog, _ ->
+                    dialog.cancel()
+                }
+            val alert = dialogBuilder.create()
 
-        alert.setTitle("Вход в NMedia")
+            alert.setTitle("Вход в NMedia")
 
-        alert.setIcon(R.drawable.ic_netology_48dp)
+            alert.setIcon(R.drawable.ic_netology_48dp)
 
-        alert.show()
+            alert.show()
+        }
+
     }
-
-}

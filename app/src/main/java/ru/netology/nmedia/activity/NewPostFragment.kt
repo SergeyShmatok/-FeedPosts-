@@ -36,8 +36,6 @@ class NewPostFragment : Fragment() {
         const val MAX_PHOTO_SIZE_PX = 2048
     }
 
-    // private val dependency: DependencyContainer = DependencyContainer.getInstance()
-
     private val viewModel: PostViewModel by activityViewModels()
 
 

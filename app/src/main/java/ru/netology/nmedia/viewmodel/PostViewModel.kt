@@ -52,7 +52,7 @@ class PostViewModel @Inject constructor (
         private val _pagingDate: Flow<PagingData<FeedItem>> =
         repository.pagingDate
             .cachedIn(viewModelScope)
-            .catch { e -> throw AppError.from(e)} // В этом
+            .catch { e -> throw AppError.from(e) } // В этом
     // задании данные об авторстве поста (ownedByMe) рассчитываются на сервере.
 
     // Оператор cachedIn() делает поток данных общим и кэширует загруженные

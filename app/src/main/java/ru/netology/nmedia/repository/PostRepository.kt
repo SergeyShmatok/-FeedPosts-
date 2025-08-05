@@ -4,6 +4,7 @@ import androidx.paging.ExperimentalPagingApi
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.TerminalSeparatorType
 import androidx.paging.insertSeparators
 import androidx.paging.map
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +34,7 @@ import ru.netology.nmedia.error.ApiError
 import ru.netology.nmedia.error.AppError
 import ru.netology.nmedia.error.NetworkError
 import ru.netology.nmedia.error.UnknownError
+import ru.netology.nmedia.util.DateSeparator
 import java.io.File
 import java.io.IOException
 import javax.inject.Inject
@@ -42,8 +44,10 @@ import kotlin.random.Random
 class PostRepository @Inject constructor(
     private val dao: PostDao,
     private val apiService: ApiService,
+    private val dateSeparator: DateSeparator,
     remoteKeyDao: PostRemoteKeyDao,
     abbDb: AppDb,
+
 ) : PostRepositoryFun {
 
     @Inject
@@ -69,15 +73,19 @@ class PostRepository @Inject constructor(
         ),
     ).flow
         .map {
-            it.map(PostEntity::toDto).insertSeparators { previous, _ ->
-                // рассмотрен пример динамической генерации рекламы, через 5 элементов
-                if (previous?.id?.rem(5) == 0L) {
-                    Ad(Random.nextLong(), "figma.jpg")
-                } else {
-                    null
-                }
+            it.map(PostEntity::toDto)
+                .insertSeparators (
+                    terminalSeparatorType = TerminalSeparatorType.SOURCE_COMPLETE, // не появится Today сверху, если не установить.
+                    generator = { previous, next -> dateSeparator.create(previous, next) }
+            ).insertSeparators { previous, _ ->
+                    // пример динамической генерации рекламы, через 5 элементов
+                    if (previous?.id?.rem(5) == 0L) {
+                        Ad(Random.nextLong(), "figma.jpg")
+                    } else {
+                        null
+                    }
 
-            } // вставка с рекламой,
+                }
             // "previous" вначале списка = null,
             // "next" в конце списка = null
         }

@@ -49,4 +49,9 @@
     <string name="entry">Entry</string>
     <string name="ad_description">ad</string>
 
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="this_week">This week</string>
+    <string name="week_ago">A week ago</string>
+
 </resources>
