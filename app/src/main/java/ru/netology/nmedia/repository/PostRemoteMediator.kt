@@ -20,7 +20,7 @@ class PostRemoteMediator @Inject constructor(
     private val apiService: ApiService,
     private val dao: PostDao,
     private val remoteKeyDao: PostRemoteKeyDao,
-    private val abbDb: AppDb,
+    private val db: AppDb,
     ) : RemoteMediator<Int, PostEntity>() {
 
     override suspend fun load(loadType: LoadType, state: PagingState<Int, PostEntity>): MediatorResult {
@@ -52,13 +52,14 @@ class PostRemoteMediator @Inject constructor(
                 }
             }
 
+
             if (!response.isSuccessful) {
                 throw ApiError(response.code(), response.message())
             }
 
             val body = response.body() ?: throw ApiError(response.code(), response.message())
 
-            abbDb.withTransaction { // Транзакция. Если произойдёт ошибка в операции с одной БД,
+            db.withTransaction { // Транзакция. Если произойдёт ошибка в операции с одной БД,
                 // то не будет выполнена вся операция. Нужно для того, чтобы при ошибке в выполнении,
                 // данные в обоих базах оставались актуальными. Атомарное выполнение.
                 when (loadType) {
@@ -106,8 +107,9 @@ class PostRemoteMediator @Inject constructor(
                 dao.insert(body.map(PostEntity::fromDto))
             }
 
-            return MediatorResult.Success(body.isEmpty()) // Передаётся один аргумент,
-            // достигнут ли конец страницы
+            return MediatorResult.Success(body.isEmpty()
+                    || body.size < state.config.pageSize)
+        // Передаётся аргумент, достигнут ли конец страницы, или ответ меньше config.pageSize
 
         } catch (e: Exception) {
             return MediatorResult.Error(e)

@@ -1,5 +1,7 @@
 package ru.netology.nmedia.activity
 
+import android.os.Build
+import android.os.Build.VERSION_CODES.TIRAMISU
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.Menu
@@ -51,6 +53,10 @@ class NewPostFragment : Fragment() {
             false
         )
 
+        if (Build.VERSION.SDK_INT > TIRAMISU) {
+            binding.topInset.visibility = View.VISIBLE
+        }
+
         arguments?.textArg1
             ?.let(binding.edit::setText)
 
@@ -81,7 +87,7 @@ class NewPostFragment : Fragment() {
 //--------------------------------------------------------------------------------------------------
 
         viewModel.postCreated.flowWithLifecycle(viewLifecycle).onEach {
-
+//            viewModel.cleanNewPost()
             findNavController().navigateUp()
             viewModel.postCreatedIsNull() // Чтобы отработал как лайв-ивент (надо "обнулить" значение)
 

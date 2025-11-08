@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Build.VERSION_CODES.TIRAMISU
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuInflater
@@ -30,7 +31,6 @@ import ru.netology.nmedia.viewmodel.AuthViewModel
 import javax.inject.Inject
 
 
-
 @AndroidEntryPoint // Из вебинара...dagger сделает так, что мы будем наследоваться не от
 // AppCompatActivity, а от DaggerAppComp... У которого в super в onCreate будет вызов Inject,
 // который доставит все зависимости.
@@ -51,10 +51,15 @@ class AppActivity: AppCompatActivity(R.layout.activity_app) {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-
         requestNotificationsPermission()
 
         checkGoogleApiAvailability()
+
+//        if (Build.VERSION.SDK_INT > TIRAMISU) {
+//            findViewById<View>(R.id.top_inset).visibility = View.VISIBLE
+////            binding.topInset.visibility = View.VISIBLE
+//        }
+//        WindowCompat.setDecorFitsSystemWindows(window, false)
 
                 intent?.let {
             if (it.action != Intent.ACTION_SEND) {
@@ -77,6 +82,7 @@ class AppActivity: AppCompatActivity(R.layout.activity_app) {
                 )
 
         }
+
 
 //----------------------------------------- MenuProvider -------------------------------------------
 
@@ -131,7 +137,7 @@ class AppActivity: AppCompatActivity(R.layout.activity_app) {
 
 
     private fun requestNotificationsPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+        if (Build.VERSION.SDK_INT < TIRAMISU) {
             return
         }
 

@@ -19,8 +19,8 @@ interface PostDao {
     @Query("SELECT max(`id`) FROM PostEntity")
     suspend fun takeLastId(): Long
 
-    @Query("SELECT * FROM PostEntity ORDER BY id DESC")
-    fun getAll(): Flow<List<PostEntity>>
+//    @Query("SELECT * FROM PostEntity ORDER BY id DESC")
+//    fun getAll(): Flow<List<PostEntity>>
 
     @Query("SELECT * FROM PostEntity ORDER BY id DESC")
     suspend fun getSimpleList(): List<PostEntity>

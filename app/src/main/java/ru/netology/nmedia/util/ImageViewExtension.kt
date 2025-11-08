@@ -5,7 +5,7 @@ import com.bumptech.glide.Glide
 import ru.netology.nmedia.R
 
 
-fun ImageView.loadAvatars(url:String) {
+fun ImageView.loadAvatars(url: String) {
     Glide.with(this)
         .load(url)
         .error(R.drawable.ic_error_100dp)
@@ -15,7 +15,7 @@ fun ImageView.loadAvatars(url:String) {
         .into(this)
 }
 
-fun ImageView.loadAttachments(url:String) {
+fun ImageView.loadAttachments(url: String) {
     Glide.with(this)
         .load(url)
         .error(R.drawable.ic_error_for_attachments_1450dp)
@@ -25,4 +25,5 @@ fun ImageView.loadAttachments(url:String) {
         .timeout(30_000)
         .into(this)
 }
+
 

@@ -1,11 +1,12 @@
 package ru.netology.nmedia.activity
 
 import android.content.Intent
+import android.os.Build
+import android.os.Build.VERSION_CODES.TIRAMISU
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -17,9 +18,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.paging.LoadState
-import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.launchIn
@@ -36,6 +37,9 @@ import ru.netology.nmedia.dao.PostRemoteKeyDao
 import ru.netology.nmedia.databinding.FragmentFeedBinding
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.entity.PostRemoteKeyEntity
+import ru.netology.nmedia.util.AndroidUtils.dialogBuilder
+import ru.netology.nmedia.util.ItemAnimatorForAd
+import ru.netology.nmedia.util.ScrollDebouncer
 import ru.netology.nmedia.util.viewLifecycle
 import ru.netology.nmedia.util.viewLifecycleScope
 import ru.netology.nmedia.viewmodel.AuthViewModel
@@ -44,6 +48,15 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class FeedFragment : Fragment() {
+
+    private companion object {
+
+        const val SCROLL_DEBOUNCE = 500L
+        const val SCROLL_DELAY = 5500L
+        const val SCROLL_THRESHOLD = 10
+        const val TOP_INSET_MARGIN = 240
+
+    }
 
     @Inject
     lateinit var dao: PostDao
@@ -57,15 +70,6 @@ class FeedFragment : Fragment() {
 
     lateinit var appActivity: AppActivity
 
-    private fun takeAppActivity(): AppActivity {
-
-        appActivity = if (::appActivity.isInitialized) appActivity
-        else (requireActivity() as AppActivity)
-
-        return appActivity
-
-    }
-
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -74,8 +78,23 @@ class FeedFragment : Fragment() {
 
         val binding = FragmentFeedBinding.inflate(inflater, container, false)
 
+        if (Build.VERSION.SDK_INT > TIRAMISU) {
+
+            binding.topInset.visibility = View.VISIBLE
+
+            val fab = binding.newerPostsFab
+
+            val marginParams = fab.layoutParams as ViewGroup.MarginLayoutParams
+
+            marginParams.setMargins(0, TOP_INSET_MARGIN, 0, 0)
+
+            fab.layoutParams = marginParams
+
+        }
+
         val adapter = PostsAdapter(
             object : OnInteractionListener {
+
                 override fun onEdit(post: Post) {
                     viewModel.edit(post)
                 }
@@ -86,7 +105,7 @@ class FeedFragment : Fragment() {
                         if (!post.likedByMe) viewModel.likeById(post.id)
                         else viewModel.removeLike(post.id)
                     } else {
-                        dialogBuilder(forLikes = true)
+                        dialogBuilder(forPosts = false, true, requireContext(), this@FeedFragment)
                     }
                 }
 
@@ -118,11 +137,15 @@ class FeedFragment : Fragment() {
             },
         )
 
+        binding.list.itemAnimator = ItemAnimatorForAd()
+
+
         binding.list.adapter = adapter.withLoadStateHeaderAndFooter(
             header = PostLoadingStateAdapter(object : InteractionListener {
                 override fun onRetry() {
                     adapter.retry()
                 }
+
             }),
             footer = PostLoadingStateAdapter(object : InteractionListener {
                 override fun onRetry() {
@@ -131,50 +154,67 @@ class FeedFragment : Fragment() {
             }),
         )
 
-//        binding.list.itemAnimator = null
-
         viewModel.pagingData.flowWithLifecycle(viewLifecycle).onEach { pagingData ->
 
             adapter.submitData(pagingData)
 
         }.launchIn(viewLifecycleScope)
 
-        viewModel.dataState.flowWithLifecycle(viewLifecycle).onEach { stateModel ->
+        viewModel.dataState.flowWithLifecycle(viewLifecycle, Lifecycle.State.STARTED).onEach { stateModel ->
             binding.progress.isVisible = stateModel.loading
             binding.swiperefresh.isRefreshing = stateModel.refreshing
-            if (stateModel.error) {
+
+            if (stateModel.error) { // Модель состояния: - ошибка -
                 Snackbar.make(binding.root, R.string.error_loading, Snackbar.LENGTH_INDEFINITE)
                     .setAction(R.string.retry_loading) {
                         adapter.refresh()
                     }.show()
             }
-            if (stateModel.likeError) {
+
+            if (stateModel.likeError) { // Лайк не поставился
                 viewModel.toastFun()
                 viewModel.cleanModel()
             }
-            if (!stateModel.postIsDeleted) {
+
+            if (!stateModel.postIsDeleted) { // Пост не удалился
                 viewModel.toastFun()
                 viewModel.cleanModel()
             }
-        }.launchIn(viewLifecycleScope)
-
-        viewModel.newerCount.flowWithLifecycle(viewLifecycle).onEach {
-            println("Новые посты: $it")
-            binding.newerPostsFab.text = getString(R.string.extended_fab_text)
-                .format("$it")
-        }.launchIn(viewLifecycleScope)
-
-
-        viewModel.newPostData.flowWithLifecycle(viewLifecycle).onEach { posts ->
-            binding.newerPostsFab.isVisible = !posts.isNullOrEmpty()
 
         }.launchIn(viewLifecycleScope)
+
+
+
+        viewLifecycleOwner.lifecycleScope.launch { // Объединение 'связанных' Flow
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+
+                launch {
+                    viewModel.newerCount.collectLatest {
+                        println("Новые посты: $it")
+                        binding.newerPostsFab.text = getString(R.string.extended_fab_text)
+                            .format("$it")
+
+                        launch {
+                            viewModel.newPostData.collectLatest { posts ->
+                                binding.newerPostsFab.isVisible =
+                                    !posts.isNullOrEmpty() && it.toString() != "0"
+                            }
+                        }
+
+                    }
+                }
+
+
+            }
+        }
+
+
 
         binding.newerPostsFab.setOnClickListener {
             viewModel.newPostsIsVisible()
             binding.list.smoothScrollToPosition(0)
 
-            viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
                 remoteKeyDao.insert(
                     PostRemoteKeyEntity(
                         PostRemoteKeyEntity.KeyType.AFTER,
@@ -184,6 +224,7 @@ class FeedFragment : Fragment() {
 
             }
         }
+
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -195,12 +236,12 @@ class FeedFragment : Fragment() {
         }
 
 
-
-        authViewModel.refreshEvents.flowWithLifecycle(viewLifecycle)
-            .onEach {
-                // Обновление списка при раз/авторизации
+        authViewModel.refreshEvents.flowWithLifecycle(viewLifecycle, Lifecycle.State.STARTED)
+            .onEach { // Обновление списка при раз/авторизации
+                viewModel.cleanNewPost()
                 adapter.refresh()
                 authViewModel.onRefresh()
+
             }.launchIn(viewLifecycleScope)
 
 
@@ -209,7 +250,7 @@ class FeedFragment : Fragment() {
             viewModel.cleanNewPost()
             adapter.refresh()
             viewLifecycleOwner.lifecycleScope.launch {
-                delay(5500)
+                delay(SCROLL_DELAY)
                 binding.list.smoothScrollToPosition(0)
             }
 
@@ -220,49 +261,33 @@ class FeedFragment : Fragment() {
             if (authViewModel.isAuthenticated) findNavController()
                 .navigate(R.id.action_feedFragment_to_newPostFragment)
             else {
-                dialogBuilder(forPosts = true)
+                dialogBuilder(forPosts = true, false, requireContext(), this)
             }
 
         }
 
-        binding.list.addOnScrollListener(
-            object : RecyclerView.OnScrollListener() {
-                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-
-
-                    if (dy > 0) { // Пользователь прокручивает вниз
-
-                        takeAppActivity().supportActionBar?.hide()
-                        binding.fab.visibility = View.INVISIBLE
-                        binding.newerPostsFab.isVisible = false
-
-                    } else { // Пользователь прокручивает вверх
-
-                        takeAppActivity().supportActionBar?.show()
-                        binding.fab.visibility = View.VISIBLE
-                        binding.newerPostsFab.isVisible =
-                            viewModel.newPostData.value?.isNotEmpty() ?: false
-                    }
-
-                    super.onScrolled(recyclerView, dx, dy)
-
-                }
-
-            }
-        )
-
+            binding.list.addOnScrollListener(ScrollDebouncer(
+            scrollDebounce = SCROLL_DEBOUNCE,
+            scrollThreshold = SCROLL_THRESHOLD,
+            postsFabIsVisible = { viewModel.newPostData.value?.isNotEmpty() ?: false },
+            newerPostsFab = binding.newerPostsFab,
+            fab = binding.fab,
+        ))
 
         return binding.root
     }
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
+
+        appActivity = requireActivity() as AppActivity
 
         fun colorSetter(resId: Int) = AppCompatResources.getDrawable(requireContext(), resId)
         // "Слушатель" навигации
         findNavController().addOnDestinationChangedListener { _, destination, _ ->
             when (destination.id) {
                 R.id.imageViewingFragment -> {
-                    takeAppActivity().apply {
+                    appActivity.apply {
                         supportActionBar?.setBackgroundDrawable(colorSetter(R.color.black))
                         supportActionBar?.hide()
                         hideStatusBar(true)
@@ -270,15 +295,14 @@ class FeedFragment : Fragment() {
                 }
 
                 R.id.application_login_fragment -> {
-                    takeAppActivity().apply {
+                    appActivity.apply {
                         supportActionBar?.hide()
-
                     }
 
                 }
 
                 else -> {
-                    takeAppActivity().apply {
+                    appActivity.apply {
                         supportActionBar?.setBackgroundDrawable(colorSetter(R.color.colorPrimary))
                         supportActionBar?.show()
                     }
@@ -287,46 +311,7 @@ class FeedFragment : Fragment() {
         }
 
         super.onCreate(savedInstanceState)
-    }
 
-
-    fun dialogBuilder(forPosts: Boolean = false, forLikes: Boolean = false) {
-
-        val writePosts = "Чтобы иметь возможность писать посты, войдите в NMedia."
-
-        val putLikes = "Чтобы иметь возможность ставить лайки, войдите в NMedia."
-
-        val standardPhrase =
-            "Чтобы иметь возможность пользоваться всеми функциями, войдите в NMedia."
-
-        val phrase = when {
-            forPosts -> writePosts
-            forLikes -> putLikes
-            else -> standardPhrase
-        }
-
-        val dialogBuilder = AlertDialog.Builder(requireActivity())
-
-        dialogBuilder.setMessage(phrase)
-            .setCancelable(false) // Если установить значение false, то пользователь
-//          не сможет закрыть диалоговое окно, например, нажатием в любой точке экрана.
-//          В таком случае пользователь должен нажать одну из предоставленных опций.
-
-            .setPositiveButton(getString(R.string.entry)) { dialog, _ ->
-                findNavController()
-                    .navigate(R.id.action_feedFragment_to_application_login_fragment)
-                dialog.cancel()
-            }
-            .setNegativeButton(getString(R.string.cancel)) { dialog, _ ->
-                dialog.cancel()
-            }
-        val alert = dialogBuilder.create()
-
-        alert.setTitle("Вход в NMedia")
-
-        alert.setIcon(R.drawable.ic_netology_48dp)
-
-        alert.show()
     }
 
 }

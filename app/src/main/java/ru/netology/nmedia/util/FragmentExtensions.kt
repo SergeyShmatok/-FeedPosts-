@@ -11,5 +11,6 @@ val Fragment.viewLifecycleScope: CoroutineScope
 
 
 val Fragment.viewLifecycle: Lifecycle
-    get() = viewLifecycleOwner.lifecycle
+    get() = viewLifecycleOwner.lifecycle // Если во фрагменте будет просто lifecycle
+    // без viewLifecycleOwner, то ссылки останутся висеть со всеми вытекающими (утечкой памяти и пр.)
 

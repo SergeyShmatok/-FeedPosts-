@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -26,7 +25,8 @@ class FCMService : FirebaseMessagingService() {
     private val gson = Gson()
 
     @Inject
-    lateinit var appAuth: AppAuth
+    lateinit var appAuth: AppAuth // Тут инжек в "тело", потому что этот класс наследник сервиса(?),
+    // как в примере с активити.
 
     // private val dependency = DependencyContainer.getInstance()
 
@@ -39,7 +39,7 @@ class FCMService : FirebaseMessagingService() {
             val channel = NotificationChannel(channelId, name, importance).apply {
                 description = descriptionText
             }
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
         }
     }

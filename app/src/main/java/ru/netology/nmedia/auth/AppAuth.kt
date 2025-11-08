@@ -37,7 +37,12 @@ class AppAuth @Inject constructor(
         val token = pref.getString(tokenKey, null)
 
         if (id == 0L || token == null) {
-            pref.edit { clear() }
+            _authState = MutableStateFlow(null)
+
+            pref.edit {
+                clear()
+                apply()
+            }
         } else {
             _authState.value = AuthState(id, token)
         }
@@ -67,6 +72,7 @@ class AppAuth @Inject constructor(
                 // с интерфейсами точки входа, установленными в SingletonComponent.
                 val entryPoint = EntryPointAccessors
                     .fromApplication(context, AppAuthEntryPoint::class.java)
+
                 entryPoint.getApiService().sendPushToken(pushToken)
 
             } catch (e: Exception) {
@@ -78,12 +84,13 @@ class AppAuth @Inject constructor(
 
     @Synchronized // означает, что метод будет защищен от одновременного выполнения
     // несколькими потоками монитором экземпляра
-    // (или, для статических методов, класса), на котором определен метод (??)
+    // (или, для статических методов, класса), на котором определен метод
     fun setAuth(userId: Long, token: String) {
         _authState.value = AuthState(userId, token)
         pref.edit {
             putString(tokenKey, token)
             putLong(idKey, userId)
+            apply()
         }
         sendPushToken()
     }
@@ -93,6 +100,7 @@ class AppAuth @Inject constructor(
         _authState.value = null
         pref.edit {
             clear()
+            apply()
         }
         sendPushToken()
     }

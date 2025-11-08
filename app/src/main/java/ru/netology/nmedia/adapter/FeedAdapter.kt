@@ -1,13 +1,9 @@
 package ru.netology.nmedia.adapter
 
-import android.animation.ObjectAnimator
-import android.animation.PropertyValuesHolder
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.animation.BounceInterpolator
 import android.widget.PopupMenu
-import androidx.core.view.isVisible
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -46,32 +42,18 @@ class PostsAdapter(
     private val typePost = 1
     private val typeAd = 2
 
+
     // Метод getItemViewType() в Android позволяет определить разные типы представлений (view types)
-// для одного элемента данных.
-
-    override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: List<Any>) {
-
-        if (payloads.isEmpty()) {
-            onBindViewHolder(holder, position)
-        } else {
-            payloads.forEach {
-                (it as? Payload)?.let { payload ->// безопасное приведение
-                    (holder as? PostViewHolder)?.bind(payload)
-                }
-
-            }
-        }
-
-    }
-
-    override fun getItemViewType(position: Int): Int {
-        return when (getItem(position)) {
+    // для одного элемента данных.
+    override fun getItemViewType(position: Int): Int =
+        // Для чего нужен этот переход от "типов" к цифрам🤔(?)
+        when (getItem(position)) {
             is TimingSeparator -> typeData
             is Post -> typePost
             is Ad -> typeAd
             null -> error("unknown item type")
+
         }
-    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder =
 
@@ -102,6 +84,7 @@ class PostsAdapter(
         }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        // Метод для обычной привязки💁‍♂️
         when (val item = getItem(position)) {
             is Ad -> (holder as? AdViewHolder)?.bind(item)
             is Post -> (holder as? PostViewHolder)?.bind(item)
@@ -116,6 +99,11 @@ class PostsAdapter(
 class AdViewHolder(
     private val binding: CardAdBinding,
 ) : ViewHolder(binding.root) {
+
+//    init {
+//        // Отключаем анимации для этого элемента
+//        itemView.setHasTransientState(true)
+//    }
 
     fun bind(ad: Ad) {
         binding.image.loadAttachments("${BuildConfig.BASE_URL}/media/${ad.image}")
@@ -161,13 +149,16 @@ class PostViewHolder(
             }
             else attachment.visibility = View.GONE
 
-            menu.isVisible = post.ownedByMe
+            menu.visibility = if (post.ownedByMe) View.VISIBLE else View.INVISIBLE
+
+//            menu.isVisible = post.ownedByMe
 
             menu.setOnClickListener {
                 PopupMenu(it.context, it).apply {
                     inflate(R.menu.options_post)
                     setOnMenuItemClickListener { item ->
                         when (item.itemId) {
+
                             R.id.remove -> {
                                 onInteractionListener.onRemove(post)
                                 true
@@ -186,13 +177,6 @@ class PostViewHolder(
 
 
             like.setOnClickListener {
-                val scaleX = PropertyValuesHolder.ofFloat(View.SCALE_X, 1F, 1.25F, 1F)
-                val scaleY = PropertyValuesHolder.ofFloat(View.SCALE_Y, 1F, 1.25F, 1F)
-                ObjectAnimator.ofPropertyValuesHolder(it, scaleX, scaleY).apply {
-                    duration = 500
-                    repeatCount = 100
-                    interpolator = BounceInterpolator()
-                }.start() // - Из учебного вопроса (д.з.)
                 onInteractionListener.onLike(post)
             }
 
@@ -208,37 +192,12 @@ class PostViewHolder(
         }
     }
 
-    fun bind(payload: Payload) {
-        payload.likedByMe?.let { likeOn ->
-            binding.like.setIconResource(
-                if (likeOn) R.drawable.ic_like_24dp else R.drawable.ic_like_filled_24dp
-            )
-            if (likeOn) {
-                ObjectAnimator.ofPropertyValuesHolder(
-                    binding.like,
-                    PropertyValuesHolder.ofFloat(View.SCALE_X, 1.0F, 1.2F, 1.0F, 1.2F),
-                    PropertyValuesHolder.ofFloat(View.SCALE_Y, 1.0F, 1.2F, 1.0F, 1.2F)
-                ).start()
-            } else {
-                ObjectAnimator.ofFloat(
-                    binding.like,
-                    View.ROTATION,
-                    0F, 360F
-                ).start()
-            }
-        }
-
-        payload.content?.let(binding.content::setText)
-    }
-
-
 }
 
-
-data class Payload(
-    val likedByMe: Boolean? = null,
-    val content: String? = null,
-)
+//data class Payload(
+//    val likedByMe: Boolean? = null,
+////    val content: String? = null,
+//)
 
 
 class PostDiffCallback : Diff() {
@@ -246,24 +205,44 @@ class PostDiffCallback : Diff() {
         if (oldItem::class != newItem::class) return false
 
         return oldItem.id == newItem.id
+
     }
 
     override fun areContentsTheSame(oldItem: FeedItem, newItem: FeedItem): Boolean {
-        return oldItem == newItem
+
+       return oldItem == newItem
+
     }
 
     override fun getChangePayload(oldItem: FeedItem, newItem: FeedItem): Any? =
+        // крч, метод нужен только для оптимизации ("производительность") и чтобы анимация
+        // использовалась в нужном месте,- чтобы не 'мелькал' весь UI ("пользовательский опыт")
 
-        if (newItem is Post && oldItem is Post) {
+        when {
 
-            Payload(
-                likedByMe = newItem.likedByMe.takeIf { it != oldItem.likedByMe }, // возьмём его,
-                // только если он не равен лайку предыдущего элемента.
-                content = newItem.content.takeIf { it != oldItem.content }, // -//-
-            )
+            newItem is Post && oldItem is Post -> true
+//            {
+//                Payload(
+//                    likedByMe = newItem.likedByMe.takeIf { it != oldItem.likedByMe }, // возьмём его,
+//                    // только если он не равен лайку предыдущего элемента.
+//                )
+//
+//            }
+            newItem is Ad && oldItem is Ad -> true
 
-        } else {
-            null
+            else -> null
+
         }
 
 }
+
+//    override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: List<Any>) {
+//
+//        if (payloads.isEmpty()) onBindViewHolder(holder, position) else {
+//
+//            (getItem(position) as? Post)?.let { (holder as? PostViewHolder)?.bind(it) }
+//
+//        }
+//
+//    // (getItem(position) as? TimingSeparator)?.let { (holder as? TimingViewHolder)?.bind(it) }
+//        }

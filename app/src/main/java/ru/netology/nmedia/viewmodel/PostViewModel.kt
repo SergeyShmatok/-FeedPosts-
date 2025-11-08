@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,12 +45,24 @@ private val empty = Post(
 
 // @Deprecated(message = "Не использовать", replaceWith = ReplaceWith...) (Из вебинара)
 @HiltViewModel
-class PostViewModel @Inject constructor (
+class PostViewModel @Inject constructor(
     private val repository: PostRepositoryFun,
     private val applicationContext: Context,
-    ) : ViewModel() {
+) : ViewModel() {
 
-        private val _pagingDate: Flow<PagingData<FeedItem>> =
+    private companion object {
+
+        const val REFRESHED_PHRASE = "Data Refreshed"
+        const val PICK_ERROR_PHRASE = "Photo pick error"
+
+        const val ACTION_FAILED_PHRASE = "Не удалось, попробуйте позже"
+        const val ERROR_PHRASE = "Ошибка :("
+        const val SOMETHING_WRONG_PHRASE = "Что-то пошло нет так..попробуйте снова"
+        const val CONNECTION_ERROR_PHRASE = "Ошибка соединения"
+
+    }
+
+    private val _pagingDate: Flow<PagingData<FeedItem>> =
         repository.pagingDate
             .cachedIn(viewModelScope)
             .catch { e -> throw AppError.from(e) } // В этом
@@ -87,7 +100,8 @@ class PostViewModel @Inject constructor (
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Lazily,
-        false)
+        false
+    )
 
     val newerCount: StateFlow<Any>
         get() = _newerCount
@@ -103,19 +117,19 @@ class PostViewModel @Inject constructor (
 
 //--------------------------------------------------------------------------------------------------
 
-    fun changePhoto (uri: Uri, file: File) {
+    fun changePhoto(uri: Uri, file: File) {
         _photo.value = PhotoModel(uri, file)
     }
 
-    fun removePhoto () {
+    fun removePhoto() {
         _photo.value = null
     }
 
 //--------------------------------------------------------------------------------------------------
 
-   fun newPostsIsVisible() = viewModelScope.launch {
-       repository.addNewPostsToRoom()
-   }
+    fun newPostsIsVisible() = viewModelScope.launch(Dispatchers.IO) {
+        repository.addNewPostsToRoom()
+    }
 
 //--------------------------------------------------------------------------------------------------
 
@@ -125,11 +139,11 @@ class PostViewModel @Inject constructor (
         try {
             repository.likeById(id)
             _dataState.value = FeedModelState(likeError = false)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             _dataState.value = FeedModelState(likeError = true)
 
-            }
         }
+    }
 
 
 //--------------------------------------------------------------------------------------------------
@@ -140,7 +154,7 @@ class PostViewModel @Inject constructor (
         try {
             repository.removeLike(id)
             _dataState.value = FeedModelState(likeError = false)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             _dataState.value = FeedModelState(likeError = true)
 
         }
@@ -168,7 +182,7 @@ class PostViewModel @Inject constructor (
             repository.removeById(id)
             _dataState.value = FeedModelState(postIsDeleted = true)
 
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             _dataState.value = FeedModelState(postIsDeleted = false)
 
         }
@@ -176,19 +190,19 @@ class PostViewModel @Inject constructor (
 
 //--------------------------------------------------------------------------------------------------
 
-    fun save() = viewModelScope.launch {
+    fun save() = viewModelScope.launch(Dispatchers.IO) {
 
         try {
             edited.value.let { post ->
                 _postCreated.value = Unit
-                 photo.value?.let {
+                photo.value?.let {
                     repository.saveWithAttachment(post, it.file)
                 } ?: repository.save(post)
 
                 _dataState.value = FeedModelState(postIsAdded = true)
             }
 
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             _dataState.value = FeedModelState(postIsAdded = false)
 
         }
@@ -198,20 +212,18 @@ class PostViewModel @Inject constructor (
 //--------------------------------------------------------------------------------------------------
 
     fun toastFun(refreshing: Boolean = false, pickError: Boolean = false) {
-        val refreshedPhrase = "Data Refreshed"
-        val pickErrorPhrase = "Photo pick error"
-        val phrase = listOf(
-            "Не удалось, попробуйте позже",
-            "Ошибка :(",
-            "Что-то пошло нет так..попробуйте снова",
-            "Ошибка соединения",
-        )
 
-        val randomPhrase = phrase.random()
+        val randomPhrase = listOf(
+            ACTION_FAILED_PHRASE,
+            ERROR_PHRASE,
+            SOMETHING_WRONG_PHRASE,
+            CONNECTION_ERROR_PHRASE,
+            ).random()
+
         val text = when {
-                refreshing -> refreshedPhrase
-                pickError -> pickErrorPhrase
-                else -> randomPhrase
+            refreshing -> REFRESHED_PHRASE
+            pickError -> PICK_ERROR_PHRASE
+            else -> randomPhrase
         }
         Toast.makeText(applicationContext, text, Toast.LENGTH_LONG).show()
     }

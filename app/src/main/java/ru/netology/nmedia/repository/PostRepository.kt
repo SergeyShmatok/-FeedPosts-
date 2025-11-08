@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import ru.netology.nmedia.api.ApiService
@@ -50,6 +51,12 @@ class PostRepository @Inject constructor(
 
 ) : PostRepositoryFun {
 
+    private companion object {
+        private const val CALL_INTERVAL = 15_000L
+        private const val AD_FREQUENCY = 5
+        private const val PAGE_SIZE = 25
+    }
+
     @Inject
     lateinit var appAuth: AppAuth
 
@@ -57,29 +64,30 @@ class PostRepository @Inject constructor(
 
     override var newPost = MutableStateFlow<List<Post>>(emptyList())
 
-    override var newerCountData: Flow<Long?> = dao.getLastId().flowOn(Dispatchers.Default)
+    override var newerCountData: Flow<Long?> = dao.getLastId().flowOn(Dispatchers.IO)
 
 //    val pagingSource: () -> PagingSource<Int, PostEntity> = fun () = dao.getPagingSource()
 //    - pagingSourceFactory имеет функциональный тип
 
     @OptIn(ExperimentalPagingApi::class)
     override val pagingDate: Flow<PagingData<FeedItem>> = Pager(
-        config = PagingConfig(pageSize = 25, enablePlaceholders = false),
+        config = PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = false),
         pagingSourceFactory = dao::getPagingSource,
         remoteMediator = PostRemoteMediator(
             apiService, dao,
             remoteKeyDao = remoteKeyDao,
-            abbDb = abbDb,
+            db = abbDb,
         ),
     ).flow
         .map {
             it.map(PostEntity::toDto)
+                .map { post -> post.copy(ownedByMe = post.authorId == appAuth.authState.value?.userId) }
                 .insertSeparators (
                     terminalSeparatorType = TerminalSeparatorType.SOURCE_COMPLETE, // не появится Today сверху, если не установить.
                     generator = { previous, next -> dateSeparator.create(previous, next) }
             ).insertSeparators { previous, _ ->
                     // пример динамической генерации рекламы, через 5 элементов
-                    if (previous?.id?.rem(5) == 0L) {
+                    if (previous?.id?.rem(AD_FREQUENCY) == 0L) {
                         Ad(Random.nextLong(), "figma.jpg")
                     } else {
                         null
@@ -103,11 +111,12 @@ class PostRepository @Inject constructor(
             val posts = response.body() ?: throw UnknownError
             dao.insert(posts.toEntity())
 
-        } catch (e: IOException) {
+        } catch (
+            _: IOException) {
             throw NetworkError
         } catch (e: ApiError) {
             throw e
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             throw UnknownError
         }
     }
@@ -117,7 +126,7 @@ class PostRepository @Inject constructor(
     override fun getNewerCount(id: Long) = flow {
 
         while (true) {  // Цикл прерывается вызовом - CancellationException -
-            delay(15_000L)
+            delay(CALL_INTERVAL)
 
             val response = apiService.getNewer(id)
 
@@ -127,7 +136,7 @@ class PostRepository @Inject constructor(
             if (!response.isSuccessful) throw ApiError(response.code(), response.message())
 
             val body = response.body() ?: throw ApiError(response.code(), response.message())
-            newPost.value += body
+            newPost.update { it + body } // атомарное потокобезопасное выполнение (на всякий случай)
 
             emit(body.size)
         }
@@ -143,13 +152,13 @@ class PostRepository @Inject constructor(
 //            mutex.withLock {        (**)
 //            newPost.value = null
 //        }
-        newPost.value = emptyList()
+        newPost.update { emptyList() }
     }
 
 //--------------------------------------------------------------------------------------------------
 
     override fun cleanNewPostInRepo() {
-        newPost.value = emptyList()
+        newPost.update { emptyList() }
     }
 
 //--------------------------------------------------------------------------------------------------
@@ -163,13 +172,13 @@ class PostRepository @Inject constructor(
 
             response.body() ?: throw UnknownError
 
-        } catch (e: IOException) {
+        } catch (_: IOException) {
             dao.removeLike(id)
             throw NetworkError
         } catch (e: ApiError) {
             dao.removeLike(id)
             throw e
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             dao.removeLike(id)
             throw UnknownError
         }
@@ -187,13 +196,13 @@ class PostRepository @Inject constructor(
 
             response.body() ?: throw UnknownError
 
-        } catch (e: IOException) {
+        } catch (_: IOException) {
             dao.likeById(id)
             throw NetworkError
         } catch (e: ApiError) {
             dao.likeById(id)
             throw e
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             dao.likeById(id)
             throw UnknownError
         }
@@ -216,13 +225,13 @@ class PostRepository @Inject constructor(
 
             response.body() ?: throw UnknownError
 
-        } catch (e: IOException) {
+        } catch (_: IOException) {
             dao.insert(currentList)
             throw NetworkError
         } catch (e: ApiError) {
             dao.insert(currentList)
             throw e
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             dao.insert(currentList)
             throw UnknownError
         }
@@ -245,11 +254,11 @@ class PostRepository @Inject constructor(
 
             dao.insert(PostEntity.fromDto(body))
 
-        } catch (e: IOException) {
+        } catch (_: IOException) {
             throw NetworkError
         } catch (e: ApiError) {
             throw e
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             throw UnknownError
         }
     }
@@ -269,11 +278,11 @@ class PostRepository @Inject constructor(
 
             dao.insert(PostEntity.fromDto(body))
 
-        } catch (e: IOException) {
+        } catch (_: IOException) {
             throw NetworkError
         } catch (e: ApiError) {
             throw e
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             throw UnknownError
         }
 
@@ -308,11 +317,11 @@ class PostRepository @Inject constructor(
 
             appAuth.setAuth(body.get("id").asLong, body.get("token").asString)
 
-        } catch (e: IOException) {
+        } catch (_: IOException) {
             throw NetworkError
         } catch (e: ApiError) {
             throw e
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             throw UnknownError
         }
 

@@ -5,8 +5,21 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:animateLayoutChanges="true"
-    >
+    android:fitsSystemWindows="false">
+    <!--    android:fitsSystemWindows="true"-->
 
+
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:id="@+id/top_inset"
+        android:layout_width="match_parent"
+        android:layout_height="24dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/appBarLayout"
+        android:background="@color/stormy_sky"
+        android:visibility="gone"
+        />
 
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/newer_posts_fab"
@@ -81,13 +94,15 @@
 
     <!--    tools:visibility="gone" - чтобы спрятать Recycler(или другие элементы)-->
 
+
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/top_inset"
+        app:layout_scrollFlags="scroll|enterAlways"
         >
 
 
@@ -101,14 +116,12 @@
             app:title=""
             app:titleCentered="true"
             app:titleTextAppearance="@dimen/_36dp"
-            app:titleTextColor="@color/colorPrimary"
-            />
+            app:titleTextColor="@color/colorPrimary" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
-        <!-- app:layout_behavior="@string/appbar_scrolling_view_behavior" - уведомлять AppBarLayout
-     о событиях прокрутки в определённом представлении.-->
-
+    <!-- app:layout_behavior="@string/appbar_scrolling_view_behavior" - уведомлять AppBarLayout
+ о событиях прокрутки в определённом представлении.-->
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swiperefresh"
@@ -116,11 +129,12 @@
         android:layout_height="0dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/appBarLayout"
-        >
-<!--        app:layout_constraintTop_toBottomOf="@id/appBarLayout"-->
-
+        app:layout_constraintVertical_bias="1.0">
+        <!--        app:layout_constraintTop_toTopOf="parent"-->
+        <!--        app:layout_constraintTop_toBottomOf="@id/appBarLayout"-->
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/list"
@@ -128,8 +142,8 @@
             android:layout_height="0dp"
             android:contentDescription="@string/some_contents_description"
             app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-            tools:listitem="@layout/card_post"
-            />
+            app:layout_behavior="@string/appbar_scrolling_view_behavior"
+            tools:listitem="@layout/card_post" />
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
